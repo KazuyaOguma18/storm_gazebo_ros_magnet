@@ -1,0 +1,9 @@
+<launch>
+
+  <!-- Virtual world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="paused" value="true" />
+    <arg name="world_name" value="$(find storm_gazebo_magnet)/worlds/dipole_magnet.world" />
+  </include>
+
+</launch>

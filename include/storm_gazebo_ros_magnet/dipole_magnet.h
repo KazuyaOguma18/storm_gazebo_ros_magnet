@@ -60,9 +60,9 @@ class DipoleMagnet : public ModelPlugin {
   /// \pram[in] torque A vector of torque that makes up the wrench to be published
   /// \pram[in] mfs A vector of magnetic field data
   void PublishData(
-      const math::Vector3& force, 
-      const math::Vector3& torque,
-      const math::Vector3& mfs);
+      const ignition::math::Vector3d& force, 
+      const ignition::math::Vector3d& torque,
+      const ignition::math::Vector3d& mfs);
 
   /// \brief Calculate force and torque of a magnet on another
   /// \parama[in] p_self Pose of the first magnet
@@ -71,19 +71,19 @@ class DipoleMagnet : public ModelPlugin {
   /// \parama[in] m_other Dipole moment of the second magnet on which the force is calculated
   /// \param[out] force Calculated force vector
   /// \param[out] torque Calculated torque vector
-  void GetForceTorque(const math::Pose& p_self,  const math::Vector3& m_self,
-      const math::Pose& p_other, const math::Vector3& m_other,
-      math::Vector3& force, math::Vector3& torque);
+  void GetForceTorque(const ignition::math::Pose3d& p_self,  const ignition::math::Vector3d& m_self,
+      const ignition::math::Pose3d& p_other, const ignition::math::Vector3d& m_other,
+      ignition::math::Vector3d& force, ignition::math::Vector3d& torque);
 
   /// \brief Calculate the magnetic field on all 6 sensors
   /// \parama[in] p_self Pose of the first magnet
   /// \parama[in] p_other Pose of the second magnet
   /// \parama[in] m_other Dipole moment of the second magnet
   /// \param[out] mfs magnetic field sensors
-  void GetMFS(const math::Pose& p_self,
-      const math::Pose& p_other,
-      const math::Vector3& m_other,
-      math::Vector3& mfs);
+  void GetMFS(const ignition::math::Pose3d& p_self,
+      const ignition::math::Pose3d& p_other,
+      const ignition::math::Vector3d& m_other,
+      ignition::math::Vector3d& mfs);
 
   // Pointer to the model
  private:
