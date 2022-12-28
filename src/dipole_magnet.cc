@@ -189,19 +189,19 @@ void DipoleMagnet::OnUpdate(const common::UpdateInfo & /*_info*/) {
   DipoleMagnetContainer& dp = DipoleMagnetContainer::Get();
 
 
-  ignition::math::Vector3<double> moment_world = p_self.Rot().RotateVector(this->mag->moment);
+  ignition::math::Vector3d moment_world = p_self.Rot().RotateVector(this->mag->moment);
 
-  ignition::math::Vector3<double> force(0, 0, 0);
-  ignition::math::Vector3<double> torque(0, 0, 0);
-  ignition::math::Vector3<double> mfs(0, 0, 0);
+  ignition::math::Vector3d force(0, 0, 0);
+  ignition::math::Vector3d torque(0, 0, 0);
+  ignition::math::Vector3d mfs(0, 0, 0);
   for(DipoleMagnetContainer::MagnetPtrV::iterator it = dp.magnets.begin(); it < dp.magnets.end(); it++){
     std::shared_ptr<DipoleMagnetContainer::Magnet> mag_other = *it;
     if (mag_other->model_id != this->mag->model_id) {
       ignition::math::Pose3d p_other = mag_other->pose;
-      ignition::math::Vector3<double> m_other = p_other.Rot().RotateVector(mag_other->moment);
+      ignition::math::Vector3d m_other = p_other.Rot().RotateVector(mag_other->moment);
 
-      ignition::math::Vector3<double> force_tmp;
-      ignition::math::Vector3<double> torque_tmp;
+      ignition::math::Vector3d force_tmp;
+      ignition::math::Vector3d torque_tmp;
       GetForceTorque(p_self, moment_world, p_other, m_other, force_tmp, torque_tmp);
 
       force += force_tmp;
@@ -221,9 +221,9 @@ void DipoleMagnet::OnUpdate(const common::UpdateInfo & /*_info*/) {
 }
 
 void DipoleMagnet::PublishData(
-    const ignition::math::Vector3<double>& force,
-    const ignition::math::Vector3<double>& torque,
-    const ignition::math::Vector3<double>& mfs){
+    const ignition::math::Vector3d& force,
+    const ignition::math::Vector3d& torque,
+    const ignition::math::Vector3d& mfs){
   if(this->should_publish && this->connect_count > 0) {
     // Rate control
     common::Time cur_time = this->world->SimTime();
