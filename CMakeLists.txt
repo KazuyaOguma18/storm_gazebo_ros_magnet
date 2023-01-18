@@ -19,3 +19,5 @@ list(APPEND CMAKE_CXX_FLAGS "${GAZEBO_CXX_FLAGS} -O2")
 add_library(storm_gazebo_dipole_magnet SHARED src/dipole_magnet.cc)
 target_link_libraries(storm_gazebo_dipole_magnet ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} ${Boost_LIBRARIES})
   
+add_library(storm_gazebo_dipole_magnet_pair SHARED src/dipole_magnet_pair.cc)
+target_link_libraries(storm_gazebo_dipole_magnet_pair ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} ${Boost_LIBRARIES})

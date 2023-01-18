@@ -87,7 +87,7 @@ class DipoleMagnetPair : public ModelPlugin {
 
   // Pointer to the model
  private:
-  std::pair<physics::ModelPtr, physics::ModelPtr> model;
+  physics::ModelPtr model;
   std::pair<physics::LinkPtr, physics::LinkPtr> link;
   physics::WorldPtr world;
 

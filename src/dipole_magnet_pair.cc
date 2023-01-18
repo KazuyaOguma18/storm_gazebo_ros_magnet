@@ -57,22 +57,34 @@ void DipoleMagnetPair::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
   this->world = _parent->GetWorld();
   gzdbg << "Loading DipoleMagnetPair plugin" << std::endl;
 
-  this->mag = std::make_shared<DipoleMagnetContainer::Magnet>();
+  this->mag = std::make_pair(std::make_shared<DipoleMagnetContainer::Magnet>(),
+                             std::make_shared<DipoleMagnetContainer::Magnet>());
 
   // load parameters
   this->robot_namespace = "";
 
-  if(!_sdf->HasElement("bodyName")) {
-    gzerr << "DipoleMagnetPair plugin missing <bodyName>, cannot proceed" << std::endl;
+  if(!_sdf->HasElement("parentBodyName")) {
+    gzerr << "DipoleMagnetPair plugin missing <parentBodyName>, cannot proceed" << std::endl;
     return;
   }else {
-    this->link_name = _sdf->GetElement("bodyName")->Get<std::string>();
-    this->low_id = std::hash<std::string>()(this->link_name);
+    this->link_name.first = _sdf->GetElement("parentBodyName")->Get<std::string>();
   }
 
-  this->link = this->model->GetLink(this->link_name);
-  if(!this->link){
-    gzerr << "Error: link named " << this->link_name << " does not exist" << std::endl;
+  if(!_sdf->HasElement("childBodyName")) {
+    gzerr << "DipoleMagnetPair plugin missing <childBodyName>, cannot proceed" << std::endl;
+    return;
+  }else {
+    this->link_name.second = _sdf->GetElement("childBodyName")->Get<std::string>();
+  }
+
+  this->link.first = this->model->GetLink(this->link_name.first);
+  if(!this->link.first){
+    gzerr << "Error: link named " << this->link_name.first << " does not exist" << std::endl;
+    return;
+  }
+  this->link.second = this->model->GetLink(this->link_name.second);
+  if(!this->link.second){
+    gzerr << "Error: link named " << this->link_name.second << " does not exist" << std::endl;
     return;
   }
 
@@ -91,29 +103,37 @@ void DipoleMagnetPair::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
   else
     this->update_rate = _sdf->GetElement("updateRate")->Get<double>();
 
-  if (_sdf->HasElement("calculate")){
-    this->mag->calculate = _sdf->Get<bool>("calculate");
-  } else
-    this->mag->calculate = true;
-
-  if (_sdf->HasElement("dipole_moment")){
-    this->mag->moment = _sdf->Get<ignition::math::Vector3d>("dipole_moment");
+  if (_sdf->HasElement("parent_dipole_moment")){
+    this->mag.first->moment = _sdf->Get<ignition::math::Vector3d>("parent_dipole_moment");
   }
 
-  if (_sdf->HasElement("xyzOffset")){
-    this->mag->offset.Pos() = _sdf->Get<ignition::math::Vector3d>("xyzOffset");
+  if (_sdf->HasElement("child_dipole_moment")){
+    this->mag.second->moment = _sdf->Get<ignition::math::Vector3d>("child_dipole_moment");
   }
 
-  if (_sdf->HasElement("rpyOffset")){
+  if (_sdf->HasElement("parentxyzOffset")){
+    this->mag.first->offset.Pos() = _sdf->Get<ignition::math::Vector3d>("xyzOffset");
+  }
+
+  if (_sdf->HasElement("childxyzOffset")){
+    this->mag.first->offset.Pos() = _sdf->Get<ignition::math::Vector3d>("xyzOffset");
+  }
+
+  if (_sdf->HasElement("parentrpyOffset")){
     ignition::math::Vector3d rpy_offset = _sdf->Get<ignition::math::Vector3d>("rpyOffset");
-    this->mag->offset.Rot() = ignition::math::Quaterniond(rpy_offset);
+    this->mag.first->offset.Rot() = ignition::math::Quaterniond(rpy_offset);
+  }
+
+  if (_sdf->HasElement("childrpyOffset")){
+    ignition::math::Vector3d rpy_offset = _sdf->Get<ignition::math::Vector3d>("rpyOffset");
+    this->mag.second->offset.Rot() = ignition::math::Quaterniond(rpy_offset);
   }
 
   if (this->should_publish) {
     if (!_sdf->HasElement("topicNs"))
     {
       gzmsg << "DipoleMagnetPair plugin missing <topicNs>," 
-          "will publish on namespace " << this->link_name << std::endl;
+          "will publish on namespace " << this->link_name.first << std::endl;
     }
     else {
       this->topic_ns = _sdf->GetElement("topicNs")->Get<std::string>();
@@ -144,11 +164,7 @@ void DipoleMagnetPair::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
     this->callback_queue_thread = boost::thread( boost::bind( &DipoleMagnetPair::QueueThread,this ) );
   }
 
-  this->mag->model_id = this->model->GetId() * 100 + this->low_id;
-
   gzmsg << "Loaded Gazebo dipole magnet plugin on " << this->model->GetName() << std::endl;
-
-  DipoleMagnetContainer::Get().Add(this->mag);
 
   // Listen to the update event. This event is broadcast every
   // simulation iteration.
@@ -177,45 +193,38 @@ void DipoleMagnetPair::QueueThread() {
 void DipoleMagnetPair::OnUpdate(const common::UpdateInfo & /*_info*/) {
 
   // Calculate the force from all other magnets
-  ignition::math::Pose3d p_self = this->link->WorldCoGPose();
-  p_self.Pos() += -p_self.Rot().RotateVector(this->mag->offset.Pos());
-  p_self.Rot() *= this->mag->offset.Rot().Inverse();
+  ignition::math::Pose3d p_self = this->link.first->WorldCoGPose();
+  p_self.Pos() += -p_self.Rot().RotateVector(this->mag.first->offset.Pos());
+  p_self.Rot() *= this->mag.first->offset.Rot().Inverse();
 
-  this->mag->pose = p_self;
+  ignition::math::Pose3d p_other = this->link.second->WorldCoGPose();
+  p_other.Pos() += -p_other.Rot().RotateVector(this->mag.second->offset.Pos());
+  p_other.Rot() *= this->mag.second->offset.Rot().Inverse();  
 
-  if (!this->mag->calculate)
-    return;
-
-  DipoleMagnetContainer& dp = DipoleMagnetContainer::Get();
-
-
-  ignition::math::Vector3d moment_world = p_self.Rot().RotateVector(this->mag->moment);
+  ignition::math::Vector3d moment_world = p_self.Rot().RotateVector(this->mag.first->moment);
 
   ignition::math::Vector3d force(0, 0, 0);
   ignition::math::Vector3d torque(0, 0, 0);
   ignition::math::Vector3d mfs(0, 0, 0);
-  for(DipoleMagnetContainer::MagnetPtrV::iterator it = dp.magnets.begin(); it < dp.magnets.end(); it++){
-    std::shared_ptr<DipoleMagnetContainer::Magnet> mag_other = *it;
-    if (mag_other->model_id != this->mag->model_id) {
-      ignition::math::Pose3d p_other = mag_other->pose;
-      ignition::math::Vector3d m_other = p_other.Rot().RotateVector(mag_other->moment);
+  
+  ignition::math::Vector3d m_other = p_other.Rot().RotateVector(this->mag.second->moment);
 
-      ignition::math::Vector3d force_tmp;
-      ignition::math::Vector3d torque_tmp;
-      GetForceTorque(p_self, moment_world, p_other, m_other, force_tmp, torque_tmp);
+  ignition::math::Vector3d force_tmp;
+  ignition::math::Vector3d torque_tmp;
+  GetForceTorque(p_self, moment_world, p_other, m_other, force_tmp, torque_tmp);
 
-      force += force_tmp;
-      torque += torque_tmp;
+  force += force_tmp;
+  torque += torque_tmp;
 
-      ignition::math::Vector3<double> mfs_tmp;
-      GetMFS(p_self, p_other, m_other, mfs_tmp);
+  ignition::math::Vector3<double> mfs_tmp;
+  GetMFS(p_self, p_other, m_other, mfs_tmp);
 
-      mfs += mfs_tmp;
+  mfs += mfs_tmp;
 
-      this->link->AddForce(force_tmp);
-      this->link->AddTorque(torque_tmp);
-    }
-  }
+  this->link.first->AddForce(force_tmp);
+  this->link.first->AddTorque(torque_tmp);
+  this->link.second->AddForce(force_tmp * (-1));
+  this->link.second->AddTorque(torque_tmp * (-1));
 
   this->PublishData(force, torque, mfs);
 }
@@ -246,7 +255,7 @@ void DipoleMagnetPair::PublishData(
 
 
     // now mfs
-    this->mfs_msg.header.frame_id = this->link_name;
+    this->mfs_msg.header.frame_id = this->link_name.first;
     this->mfs_msg.header.stamp.sec = cur_time.sec;
     this->mfs_msg.header.stamp.nsec = cur_time.nsec;
 
