@@ -33,11 +33,11 @@
 
 namespace gazebo {
 
-class DipoleMagnet : public ModelPlugin {
+class DipoleMagnetPair : public ModelPlugin {
  public:
-  DipoleMagnet();
+  DipoleMagnetPair();
 
-  ~DipoleMagnet();
+  ~DipoleMagnetPair();
 
   /// \brief Loads the plugin
   void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf);
@@ -87,13 +87,14 @@ class DipoleMagnet : public ModelPlugin {
 
   // Pointer to the model
  private:
-  physics::ModelPtr model;
-  physics::LinkPtr link;
+  std::pair<physics::ModelPtr, physics::ModelPtr> model;
+  std::pair<physics::LinkPtr, physics::LinkPtr> link;
   physics::WorldPtr world;
 
-  std::shared_ptr<DipoleMagnetContainer::Magnet> mag;
+  typedef std::shared_ptr<DipoleMagnetContainer::Magnet> MagnetPtr;
+  std::pair<MagnetPtr, MagnetPtr> mag;
 
-  std::string link_name;
+  std::pair<std::string, std::string> link_name;
   std::string robot_namespace;
   std::string topic_ns;
   std::uint32_t low_id;

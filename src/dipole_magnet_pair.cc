@@ -29,15 +29,15 @@
 #include <cstdint>
 #include <functional>
 
-#include "storm_gazebo_ros_magnet/dipole_magnet.h"
+#include "storm_gazebo_ros_magnet/dipole_magnet_pair.h"
 
 namespace gazebo {
 
-DipoleMagnet::DipoleMagnet(): ModelPlugin() {
+DipoleMagnetPair::DipoleMagnetPair(): ModelPlugin() {
   this->connect_count = 0;
 }
 
-DipoleMagnet::~DipoleMagnet() {
+DipoleMagnetPair::~DipoleMagnetPair() {
   this->update_connection.reset();
   if (this->should_publish) {
     this->queue.clear();
@@ -46,26 +46,24 @@ DipoleMagnet::~DipoleMagnet() {
     this->callback_queue_thread.join();
     delete this->rosnode;
   }
-  if (this->mag){
-    DipoleMagnetContainer::Get().Remove(this->mag);
-  }
+  // if (this->mag.first && this->mag.second) {
+  //   DipoleMagnetContainer::Get().Remove(this->mag);
+  // }
 }
 
-void DipoleMagnet::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
+void DipoleMagnetPair::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
   // Store the pointer to the model
   this->model = _parent;
   this->world = _parent->GetWorld();
-  gzdbg << "Loading DipoleMagnet plugin" << std::endl;
+  gzdbg << "Loading DipoleMagnetPair plugin" << std::endl;
 
   this->mag = std::make_shared<DipoleMagnetContainer::Magnet>();
 
   // load parameters
   this->robot_namespace = "";
-  if (_sdf->HasElement("robotNamespace"))
-    this->robot_namespace = _sdf->GetElement("robotNamespace")->Get<std::string>() + "/";
 
   if(!_sdf->HasElement("bodyName")) {
-    gzerr << "DipoleMagnet plugin missing <bodyName>, cannot proceed" << std::endl;
+    gzerr << "DipoleMagnetPair plugin missing <bodyName>, cannot proceed" << std::endl;
     return;
   }else {
     this->link_name = _sdf->GetElement("bodyName")->Get<std::string>();
@@ -86,7 +84,7 @@ void DipoleMagnet::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
 
   if (!_sdf->HasElement("updateRate"))
   {
-    gzmsg << "DipoleMagnet plugin missing <updateRate>, defaults to 0.0"
+    gzmsg << "DipoleMagnetPair plugin missing <updateRate>, defaults to 0.0"
         " (as fast as possible)" << std::endl;
     this->update_rate = 0;
   }
@@ -114,7 +112,7 @@ void DipoleMagnet::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
   if (this->should_publish) {
     if (!_sdf->HasElement("topicNs"))
     {
-      gzmsg << "DipoleMagnet plugin missing <topicNs>," 
+      gzmsg << "DipoleMagnetPair plugin missing <topicNs>," 
           "will publish on namespace " << this->link_name << std::endl;
     }
     else {
@@ -135,15 +133,15 @@ void DipoleMagnet::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
 
     this->wrench_pub = this->rosnode->advertise<geometry_msgs::WrenchStamped>(
         this->topic_ns + "/wrench", 1,
-        boost::bind( &DipoleMagnet::Connect,this),
-        boost::bind( &DipoleMagnet::Disconnect,this), ros::VoidPtr(), &this->queue);
+        boost::bind( &DipoleMagnetPair::Connect,this),
+        boost::bind( &DipoleMagnetPair::Disconnect,this), ros::VoidPtr(), &this->queue);
     this->mfs_pub = this->rosnode->advertise<sensor_msgs::MagneticField>(
         this->topic_ns + "/mfs", 1,
-        boost::bind( &DipoleMagnet::Connect,this),
-        boost::bind( &DipoleMagnet::Disconnect,this), ros::VoidPtr(), &this->queue);
+        boost::bind( &DipoleMagnetPair::Connect,this),
+        boost::bind( &DipoleMagnetPair::Disconnect,this), ros::VoidPtr(), &this->queue);
 
     // Custom Callback Queue
-    this->callback_queue_thread = boost::thread( boost::bind( &DipoleMagnet::QueueThread,this ) );
+    this->callback_queue_thread = boost::thread( boost::bind( &DipoleMagnetPair::QueueThread,this ) );
   }
 
   this->mag->model_id = this->model->GetId() * 100 + this->low_id;
@@ -155,18 +153,18 @@ void DipoleMagnet::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf) {
   // Listen to the update event. This event is broadcast every
   // simulation iteration.
   this->update_connection = event::Events::ConnectWorldUpdateBegin(
-      boost::bind(&DipoleMagnet::OnUpdate, this, _1));
+      boost::bind(&DipoleMagnetPair::OnUpdate, this, _1));
 }
 
-void DipoleMagnet::Connect() {
+void DipoleMagnetPair::Connect() {
   this->connect_count++;
 }
 
-void DipoleMagnet::Disconnect() {
+void DipoleMagnetPair::Disconnect() {
   this->connect_count--;
 }
 
-void DipoleMagnet::QueueThread() {
+void DipoleMagnetPair::QueueThread() {
   static const double timeout = 0.01;
 
   while (this->rosnode->ok())
@@ -176,7 +174,7 @@ void DipoleMagnet::QueueThread() {
 }
 
 // Called by the world update start event
-void DipoleMagnet::OnUpdate(const common::UpdateInfo & /*_info*/) {
+void DipoleMagnetPair::OnUpdate(const common::UpdateInfo & /*_info*/) {
 
   // Calculate the force from all other magnets
   ignition::math::Pose3d p_self = this->link->WorldCoGPose();
@@ -222,7 +220,7 @@ void DipoleMagnet::OnUpdate(const common::UpdateInfo & /*_info*/) {
   this->PublishData(force, torque, mfs);
 }
 
-void DipoleMagnet::PublishData(
+void DipoleMagnetPair::PublishData(
     const ignition::math::Vector3d& force,
     const ignition::math::Vector3d& torque,
     const ignition::math::Vector3d& mfs){
@@ -265,7 +263,7 @@ void DipoleMagnet::PublishData(
 }
 
 
-void DipoleMagnet::GetForceTorque(const ignition::math::Pose3d& p_self,
+void DipoleMagnetPair::GetForceTorque(const ignition::math::Pose3d& p_self,
     const ignition::math::Vector3d& m_self,
     const ignition::math::Pose3d& p_other,
     const ignition::math::Vector3d& m_other,
@@ -292,7 +290,7 @@ void DipoleMagnet::GetForceTorque(const ignition::math::Pose3d& p_self,
     std::cout << "B: " << B1 << " K: " << Ktorque << " t: " << torque << std::endl;
 }
 
-void DipoleMagnet::GetMFS(const ignition::math::Pose3d& p_self,
+void DipoleMagnetPair::GetMFS(const ignition::math::Pose3d& p_self,
     const ignition::math::Pose3d& p_other,
     const ignition::math::Vector3d& m_other,
     ignition::math::Vector3d& mfs) {
@@ -315,6 +313,6 @@ void DipoleMagnet::GetMFS(const ignition::math::Pose3d& p_self,
 }
 
 // Register this plugin with the simulator
-GZ_REGISTER_MODEL_PLUGIN(DipoleMagnet)
+GZ_REGISTER_MODEL_PLUGIN(DipoleMagnetPair)
 
 }
